@@ -1,41 +1,51 @@
-const fastify = require("fastify")({ logger: true });
-const dotenv = require("dotenv");
+import Fastify from "fastify";
+import multipart from "@fastify/multipart";
+import fs from "fs";
+import util from "util";
+import { pipeline } from "stream";
+import fastifyStatic from "@fastify/static";
 const port = process.env.PORT || 3003;
-const multipart = require("@fastify/multipart");
-const fs = require("fs");
-const { pipeline } = require("stream");
 
-fastify.register(multipart);
+const pump = util.promisify(pipeline);
 
-fastify.post("/upload", async (req, reply) => {
-  const { file } = await req.file();
-  console.log("file:",file.filename);
+export const app = Fastify({
+  logger: true,
+});
 
-  if (!file) {
+app.register(multipart);
+
+app.post("/upload", async (req, reply) => {
+  const data = await req.file();
+  if (!data) {
     reply.code(400).send({ message: "Dosya bulunamadı." });
     return;
   }
-  const targetPath = `./uploads/${file.filename}`;
+  const targetPath = `./uploads/${data.filename}`;
 
   try {
-    await pipeline(
-      fs.createReadStream(file.tempFilePath),
-      fs.createWriteStream(targetPath)
-    );
-    return { filename: file.filename };
+    await pump(data.file,fs.createWriteStream(`./uploads/${data.filename}`));
+    return { message: "Dosya başarıyla yüklendi ve kaydedildi." };
   } catch (err) {
-    console.error("\n Dosya kaydedilirken hata oluştu:", err);
+    console.error("Dosya kaydedilirken hata oluştu:", err);
     reply.code(500).send({ message: "Dosya kaydedilirken bir hata oluştu." });
   }
+  console.log(data.tempFilePath);
+  return { message: "dosya yüklendi" };
 });
+
+// Upload edilen dosyaların dışarıya erişilebilir hale getirilmesi
+app.register(fastifyStatic, {
+  root: 'C:\\Users\\pc\\Desktop\\fastify\\uploads', // Dosyaların bulunduğu dizin
+  prefix: '/uploads' // Dışarıya erişim için kullanılacak URL öneki
+});
+
 
 const start = async () => {
   try {
-    await fastify.listen(port);
-    console.log("server bağlantısı başarılı");
+    await app.listen({ port }); // Değişiklik: Listen yöntemi değiştirildi
+    console.log("Server bağlantısı başarılı. Port:", port);
   } catch (err) {
-    console.log("server bağlantısı başarısız");
-    fastify.log.error(err);
+    console.error("Server bağlantısı başarısız:", err);
     process.exit(1);
   }
 };
