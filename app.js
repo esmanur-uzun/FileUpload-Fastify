@@ -24,7 +24,8 @@ app.post("/upload", async (req, reply) => {
 
   try {
     await pump(data.file,fs.createWriteStream(`./uploads/${data.filename}`));
-    return { message: "Dosya başarıyla yüklendi ve kaydedildi." };
+    const fileUrl = `${req.protocol}://${req.hostname}/uploads/${data.filename}`;
+    return { message: "Dosya başarıyla yüklendi ve kaydedildi.",fileUrl };
   } catch (err) {
     console.error("Dosya kaydedilirken hata oluştu:", err);
     reply.code(500).send({ message: "Dosya kaydedilirken bir hata oluştu." });
